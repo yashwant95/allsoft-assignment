@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { EyeInvisibleOutlined, EyeTwoTone, MobileOutlined, KeyOutlined } from '@ant-design/icons';
 import { Form, Input, Button, Card, message, notification, Typography, Spin } from 'antd';
+import { generateOTP } from '../coreApi/authentication/LoginApi';
 
 const { Title, Text } = Typography;
 
@@ -21,23 +22,33 @@ const Login = () => {
     { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
   ];
   
-  // Generate OTP (UI only - no API call)
+  // Generate OTP API call
   const handleGenerateOTP = async () => {
     try {
       await form.validateFields(['mobileNumber']);
       const mobile = form.getFieldValue('mobileNumber');
       
-      // Simulate loading
+      // Set loading state
       setIsLoading(true);
       
-      // Simulate API delay
-      setTimeout(() => {
-        setShowOTP(true);
-        setIsLoading(false);
-        message.success('OTP sent successfully to your mobile number!');
-      }, 1500);
+      // Call the generateOTP API
+      const response = await generateOTP(mobile);
+      
+      // Show OTP input on success
+      setShowOTP(true);
+      message.success('OTP sent successfully to your mobile number!');
+      
     } catch (error) {
-      // Validation errors will be shown automatically
+      console.error('Error generating OTP:', error);
+      
+      // Show error message to user
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Failed to generate OTP. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
   

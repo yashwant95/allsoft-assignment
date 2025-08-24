@@ -132,6 +132,17 @@ const Registration = () => {
             >
               Create User
             </Button>
+            
+            {/* Back to Login Button */}
+            <Button
+              type="default"
+              size="large"
+              block
+              className="mt-2"
+              onClick={() => window.location.href = '/login'}
+            >
+              Back to Login
+            </Button>
           </Form>
         </Card>
         

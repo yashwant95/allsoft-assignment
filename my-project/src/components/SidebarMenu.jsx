@@ -31,36 +31,7 @@ const SidebarMenu = ({ isOpen }) => {
       icon: faTachometerAlt,
       label: "Dashboard",
     },
-    {
-      path: "/documents",
-      icon: faFileAlt,
-      label: "Documents",
-    },
-    {
-      path: "/folders",
-      icon: faFolder,
-      label: "Folders",
-    },
-    {
-      path: "/search",
-      icon: faSearch,
-      label: "Search",
-    },
-    {
-      path: "/users",
-      icon: faUsers,
-      label: "User Management",
-    },
-    {
-      path: "/reports",
-      icon: faChartBar,
-      label: "Reports",
-    },
-    {
-      path: "/settings",
-      icon: faCogs,
-      label: "Settings",
-    },
+   
   ];
 
   const renderMenuItem = (item) => {

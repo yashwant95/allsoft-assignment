@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UploadOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Input, DatePicker, Select, message, Card, Form, Space, Upload, Alert } from 'antd';
-import { uploadFile, getTags, searchDocumentTags } from '../coreApi/upload file/uploadfileApi';
+import { uploadFile, getTags, searchDocumentTags, getDropdownOptions } from '../coreApi/upload file/uploadfileApi';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const { TextArea } = Input;
@@ -21,50 +21,79 @@ const UploadFile = () => {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [tagSearchTerm, setTagSearchTerm] = useState('');
   const [searchingTags, setSearchingTags] = useState(false);
+  const [loadingTags, setLoadingTags] = useState(true);
+  const [dropdownOptions, setDropdownOptions] = useState({});
+  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // Pre-defined options for dropdowns
-  const categoryOptions = [
-    { value: 'Personal', label: 'Personal' },
-    { value: 'Professional', label: 'Professional' }
-  ];
+  // Fallback hardcoded options in case API fails
+  const fallbackOptions = {
+    'Personal': [
+      { value: 'John', label: 'John' },
+      { value: 'Tom', label: 'Tom' },
+      { value: 'Emily', label: 'Emily' },
+      { value: 'Sarah', label: 'Sarah' },
+      { value: 'Mike', label: 'Mike' }
+    ],
+    'Professional': [
+      { value: 'Accounts', label: 'Accounts' },
+      { value: 'HR', label: 'HR' },
+      { value: 'IT', label: 'IT' },
+      { value: 'Finance', label: 'Finance' },
+      { value: 'Marketing', label: 'Marketing' },
+      { value: 'Sales', label: 'Sales' }
+    ]
+  };
 
-  const personalOptions = [
-    { value: 'John', label: 'John' },
-    { value: 'Tom', label: 'Tom' },
-    { value: 'Emily', label: 'Emily' },
-    { value: 'Sarah', label: 'Sarah' },
-    { value: 'Mike', label: 'Mike' }
-  ];
-
-  const professionalOptions = [
-    { value: 'Accounts', label: 'Accounts' },
-    { value: 'HR', label: 'HR' },
-    { value: 'IT', label: 'IT' },
-    { value: 'Finance', label: 'Finance' },
-    { value: 'Marketing', label: 'Marketing' },
-    { value: 'Sales', label: 'Sales' }
-  ];
-
-  // Fetch existing tags from API
+  // Fetch existing tags and dropdown options from API
   useEffect(() => {
     fetchExistingTags();
+    fetchDropdownOptions();
   }, []);
 
   // Update sub-options when category changes
   useEffect(() => {
-    if (category === 'Personal') {
-      setSubOptions(personalOptions);
-    } else if (category === 'Professional') {
-      setSubOptions(professionalOptions);
+    if (category && dropdownOptions[category]) {
+      setSubOptions(dropdownOptions[category]);
+    } else if (category && fallbackOptions[category]) {
+      // Fallback to hardcoded options if API options not available
+      setSubOptions(fallbackOptions[category]);
     } else {
       setSubOptions([]);
     }
     // Reset minor_head when category changes
     form.setFieldsValue({ minor_head: undefined });
-  }, [category, form]);
+  }, [category, dropdownOptions, form]);
+
+  const fetchDropdownOptions = async () => {
+    try {
+      setLoadingDropdowns(true);
+      console.log('Fetching dropdown options from API...');
+      
+      const response = await getDropdownOptions();
+      console.log('API response for dropdown options:', response);
+      
+      if (response.status === true && response.data && Object.keys(response.data).length > 0) {
+        console.log('Dropdown options fetched from API:', response.data);
+        setDropdownOptions(response.data);
+        message.success('Dropdown options updated successfully');
+      } else {
+        console.warn('No dropdown options received from API, using fallback options');
+        setDropdownOptions(fallbackOptions);
+        message.warning('Using fallback dropdown options');
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown options:', error);
+      console.log('Using fallback dropdown options due to error');
+      setDropdownOptions(fallbackOptions);
+      message.error('Failed to fetch dropdown options, using fallback options');
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
 
   const fetchExistingTags = async () => {
     try {
+      setLoadingTags(true);
       // Use the new searchDocumentTags API with empty term to get all tags
       const response = await searchDocumentTags("");
       
@@ -72,11 +101,16 @@ const UploadFile = () => {
         // Extract tag labels from the response data
         const tags = response.data?.map(item => item.label) || [];
         setExistingTags(tags);
+      } else {
+        // No tags available from API
+        setExistingTags([]);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
-      // Fallback to some default tags if API fails
-      setExistingTags(['RMC', '2024', 'work_order', 'important', 'urgent']);
+      // No fallback tags - set empty array if API fails
+      setExistingTags([]);
+    } finally {
+      setLoadingTags(false);
     }
   };
 
@@ -121,11 +155,14 @@ const UploadFile = () => {
         // Extract tag labels from the response data
         const tags = response.data?.map(item => item.label) || [];
         setExistingTags(tags);
+      } else {
+        // No tags found for search term
+        setExistingTags([]);
       }
     } catch (error) {
       console.error('Error searching tags:', error);
-      // Fallback to all tags if search fails
-      await fetchExistingTags();
+      // Set empty array if search fails
+      setExistingTags([]);
     } finally {
       setSearchingTags(false);
     }
@@ -158,6 +195,7 @@ const UploadFile = () => {
     setSubOptions([]);
     setTagSearchTerm('');
     fetchExistingTags(); // Refresh tags
+    fetchDropdownOptions(); // Refresh dropdown options
   };
 
   // Handle confirmation modal cancel
@@ -173,6 +211,7 @@ const UploadFile = () => {
     setSubOptions([]);
     setTagSearchTerm('');
     fetchExistingTags(); // Refresh tags
+    fetchDropdownOptions(); // Refresh dropdown options
   };
 
   // Handle form submission
@@ -310,6 +349,8 @@ const UploadFile = () => {
               cancelText="Close"
               showSuccessMessage={false}
             />
+
+
           {/* File Upload Section */}
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-3">Select File</h3>
@@ -334,18 +375,37 @@ const UploadFile = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Category Selection */}
             <Form.Item
-              label="Category"
+              label={
+                <div className="flex items-center justify-between">
+                  <span>Category</span>
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={fetchDropdownOptions}
+                    loading={loadingDropdowns}
+                    className="p-0 h-auto"
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              }
               required
             >
               <Select
-                placeholder="Select category"
+                placeholder={loadingDropdowns ? "Loading categories..." : "Select category"}
                 value={category}
                 onChange={setCategory}
                 className="w-full"
+                loading={loadingDropdowns}
+                disabled={loadingDropdowns}
+                notFoundContent={
+                  loadingDropdowns ? "Loading..." : 
+                  Object.keys(dropdownOptions).length === 0 ? "No categories available" : "No matching categories"
+                }
               >
-                {categoryOptions.map(option => (
-                  <Option key={option.value} value={option.value}>
-                    {option.label}
+                {Object.keys(dropdownOptions).map(option => (
+                  <Option key={option} value={option}>
+                    {option}
                   </Option>
                 ))}
               </Select>
@@ -354,13 +414,18 @@ const UploadFile = () => {
             {/* Dynamic Second Dropdown */}
             <Form.Item
               name="minor_head"
-              label={category === 'Personal' ? 'Name' : category === 'Professional' ? 'Department' : 'Select'}
+              label={category ? (category === 'Personal' ? 'Name' : 'Department') : 'Select'}
               rules={[{ required: true, message: `Please select ${category === 'Personal' ? 'a name' : 'a department'}` }]}
             >
               <Select
-                placeholder={`Select ${category === 'Personal' ? 'name' : category === 'Professional' ? 'department' : 'option'}`}
-                disabled={!category}
+                placeholder={category ? `Select ${category === 'Personal' ? 'name' : 'department'}` : 'Select category first'}
+                disabled={!category || loadingDropdowns}
                 className="w-full"
+                loading={loadingDropdowns}
+                notFoundContent={
+                  loadingDropdowns ? "Loading..." : 
+                  subOptions.length === 0 ? "No options available for selected category" : "No matching options"
+                }
               >
                 {subOptions.map(option => (
                   <Option key={option.value} value={option.value}>
@@ -439,6 +504,7 @@ const UploadFile = () => {
                     fetchExistingTags();
                   }}
                   size="small"
+                  disabled={loadingDropdowns}
                 >
                   Show All
                 </Button>
@@ -451,7 +517,17 @@ const UploadFile = () => {
                 Existing Tags: {existingTags.length > 0 && `(${existingTags.length} found)`}
               </h4>
               <div className="flex flex-wrap gap-2">
-                {existingTags.length > 0 ? (
+                {loadingTags ? (
+                  <div className="text-center w-full py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-500 text-sm">Loading existing tags...</p>
+                  </div>
+                ) : searchingTags ? (
+                  <div className="text-center w-full py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-500 text-sm">Searching tags...</p>
+                  </div>
+                ) : existingTags.length > 0 ? (
                   existingTags.map((tag, index) => (
                     <span
                       key={index}
@@ -462,7 +538,14 @@ const UploadFile = () => {
                     </span>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-sm">No tags found. Try searching or adding a new tag.</p>
+                  <div className="text-center w-full py-4">
+                    <p className="text-gray-500 text-sm mb-2">
+                      {tagSearchTerm ? 'No tags found for your search.' : 'No existing tags available.'}
+                    </p>
+                    <p className="text-gray-400 text-xs">
+                      You can add new tags below or try a different search term.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

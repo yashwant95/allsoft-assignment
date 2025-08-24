@@ -314,6 +314,83 @@ export const getDocumentDetails = async (documentId) => {
   }
 };
 
+// Get dropdown options for major_head and minor_head
+export const getDropdownOptions = async () => {
+  try {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+      throw new Error('Authentication token not found. Please login again.');
+    }
+
+    // Use searchDocumentEntry with empty search to get all documents
+    const searchParams = {
+      major_head: "",
+      minor_head: "",
+      from_date: "",
+      to_date: "",
+      tags: [],
+      uploaded_by: "",
+      start: 0,
+      length: 1000, // Get more records to ensure we have all options
+      filterId: "",
+      search: {
+        value: ""
+      }
+    };
+
+    const config = {
+      method: 'post',
+      maxBodyLength: Infinity,
+      url: `${API_CONFIG.BASE_URL}/api/documentManagement/searchDocumentEntry`,
+      headers: { 
+        'token': token,
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}`
+      },
+      data: searchParams
+    };
+
+    const response = await axios.request(config);
+    
+    if (response.data.status === true && response.data.data) {
+      // Extract unique major_head and minor_head combinations
+      const options = {};
+      
+      response.data.data.forEach(item => {
+        if (item.major_head && item.minor_head) {
+          if (!options[item.major_head]) {
+            options[item.major_head] = new Set();
+          }
+          options[item.major_head].add(item.minor_head);
+        }
+      });
+
+      // Convert Sets to arrays
+      const formattedOptions = {};
+      Object.keys(options).forEach(majorHead => {
+        formattedOptions[majorHead] = Array.from(options[majorHead]).map(value => ({
+          value: value,
+          label: value
+        }));
+      });
+
+      return {
+        status: true,
+        data: formattedOptions
+      };
+    }
+    
+    return {
+      status: false,
+      message: 'No data received from API'
+    };
+  } catch (error) {
+    console.error('Error fetching dropdown options:', error);
+    throw error;
+  }
+};
+
 export default {
   uploadFile,
   getTags,
@@ -325,5 +402,6 @@ export default {
   deleteDocument,
   updateDocument,
   getDocumentDetails,
+  getDropdownOptions,
   debugAuth
 };

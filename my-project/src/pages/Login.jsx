@@ -34,9 +34,20 @@ const Login = () => {
       // Call the generateOTP API
       const response = await generateOTP(mobile);
       
-      // Show OTP input on success
-      setShowOTP(true);
-      message.success('OTP sent successfully to your mobile number!');
+      // Check if account exists
+      if (response.status === false && response.data === "This Mobile Number is not yet Registered.") {
+        // Account doesn't exist, show registration message
+        message.warning('Account not found. Please register a new account.');
+        // You can add navigation to registration page here
+        // window.location.href = '/registration';
+      } else if (response.status === true || response.success) {
+        // Show OTP input on success
+        setShowOTP(true);
+        message.success('OTP sent successfully to your mobile number!');
+      } else {
+        // Handle other error cases
+        message.error(response.data || 'Failed to generate OTP. Please try again.');
+      }
       
     } catch (error) {
       console.error('Error generating OTP:', error);
@@ -189,6 +200,19 @@ const Login = () => {
               </Button>
             )}
           </Form>
+          
+          {/* Registration Link */}
+          <div className="text-center mt-4">
+            <Text type="secondary" className="text-sm">
+              Don't have an account?{' '}
+              <a 
+                href="/registration" 
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Register here
+              </a>
+            </Text>
+          </div>
         </Card>
         
         {/* Footer */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SearchOutlined, ClearOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Button, Input, DatePicker, Select, Card, Form, Space, Tag, Table, message } from 'antd';
-import axios from 'axios';
+import { getTags, searchDocuments } from '../coreApi/upload file/uploadfileApi';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -59,15 +59,10 @@ const FileSearch = () => {
 
   const fetchExistingTags = async () => {
     try {
-      // Replace with your actual API endpoint for fetching tags
-      const response = await axios.get('https://apis.allsoft.co/api/documentManagement/getTags', {
-        headers: {
-          'token': localStorage.getItem('authToken') || 'your_generated_token'
-        }
-      });
+      const response = await getTags();
       
-      if (response.data.status === true) {
-        setExistingTags(response.data.tags || []);
+      if (response.status === true) {
+        setExistingTags(response.tags || []);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -115,26 +110,18 @@ const FileSearch = () => {
         searchParams[key] === undefined && delete searchParams[key]
       );
 
-      // Replace with your actual search API endpoint
-      const response = await axios.post('https://apis.allsoft.co/api/documentManagement/searchDocuments', 
-        searchParams,
-        {
-          headers: {
-            'token': localStorage.getItem('authToken') || 'your_generated_token',
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      // Call the search API
+      const response = await searchDocuments(searchParams);
       
-      if (response.data.status === true) {
-        setSearchResults(response.data.documents || []);
-        if (response.data.documents?.length === 0) {
+      if (response.status === true) {
+        setSearchResults(response.documents || []);
+        if (response.documents?.length === 0) {
           message.info('No documents found matching your search criteria.');
         } else {
-          message.success(`Found ${response.data.documents.length} document(s)`);
+          message.success(`Found ${response.documents.length} document(s)`);
         }
       } else {
-        message.error(response.data.message || 'Search failed');
+        message.error(response.message || 'Search failed');
       }
     } catch (error) {
       console.error('Search error:', error);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UploadOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Input, DatePicker, Select, message, Card, Form, Space, Upload } from 'antd';
-import axios from 'axios';
+import { Button, Input, DatePicker, Select, message, Card, Form, Space, Upload, Alert } from 'antd';
+import { uploadFile, getTags } from '../coreApi/upload file/uploadfileApi';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -15,6 +16,9 @@ const UploadFile = () => {
   const [existingTags, setExistingTags] = useState([]);
   const [category, setCategory] = useState('');
   const [subOptions, setSubOptions] = useState([]);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   // Pre-defined options for dropdowns
   const categoryOptions = [
@@ -59,15 +63,10 @@ const UploadFile = () => {
 
   const fetchExistingTags = async () => {
     try {
-      // Replace with your actual API endpoint for fetching tags
-      const response = await axios.get('https://apis.allsoft.co/api/documentManagement/getTags', {
-        headers: {
-          'token': localStorage.getItem('authToken') || 'your_generated_token'
-        }
-      });
+      const response = await getTags();
       
-      if (response.data.status === true) {
-        setExistingTags(response.data.tags || []);
+      if (response.status === true) {
+        setExistingTags(response.tags || []);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -101,8 +100,39 @@ const UploadFile = () => {
     }
   };
 
+  // Handle confirmation modal confirm
+  const handleConfirmSuccess = () => {
+    setShowConfirmationModal(false);
+    setShowSuccessAlert(false);
+    
+    // Reset form
+    form.resetFields();
+    setFileList([]);
+    setTags([]);
+    setCategory('');
+    setSubOptions([]);
+  };
+
+  // Handle confirmation modal cancel
+  const handleCancelSuccess = () => {
+    setShowConfirmationModal(false);
+    setShowSuccessAlert(false);
+    
+    // Reset form
+    form.resetFields();
+    setFileList([]);
+    setTags([]);
+    setCategory('');
+    setSubOptions([]);
+  };
+
   // Handle form submission
   const handleSubmit = async (values) => {
+    console.log('Form submitted - API call will be made now');
+    
+    // Test message to verify message system is working
+    message.info('Form submission started...');
+    
     if (fileList.length === 0) {
       message.error('Please select a file to upload');
       return;
@@ -116,9 +146,6 @@ const UploadFile = () => {
     setLoading(true);
     
     try {
-      const formData = new FormData();
-      formData.append('file', fileList[0].originFileObj);
-      
       // Prepare data object
       const dataObject = {
         major_head: category,
@@ -129,30 +156,51 @@ const UploadFile = () => {
         user_id: values.user_id
       };
       
-      formData.append('data', JSON.stringify(dataObject));
-
-      const config = {
-        method: 'post',
-        maxBodyLength: Infinity,
-        url: 'https://apis.allsoft.co/api/documentManagement/saveDocumentEntry',
-        headers: { 
-          'token': localStorage.getItem('authToken') || 'your_generated_token',
-          ...formData.getHeaders()
-        },
-        data: formData
-      };
-
-      const response = await axios.request(config);
+      console.log('Calling upload API with data:', dataObject);
       
-      if (response.data.status === true) {
-        message.success('File uploaded successfully!');
-        form.resetFields();
-        setFileList([]);
-        setTags([]);
-        setCategory('');
-        setSubOptions([]);
+      // Call the upload API
+      const response = await uploadFile(fileList[0].originFileObj, dataObject);
+      
+      console.log('API response received:', response);
+      
+      if (response.status === true) {
+        console.log('Success! Showing success message:', response.message);
+        console.log('Response object:', response);
+        console.log('Response status:', response.status);
+        console.log('Response message:', response.message);
+        
+        // Show success message with longer duration and better visibility
+        message.success({
+          content: response.message || 'File uploaded successfully!',
+          duration: 10, // Show for 10 seconds
+          style: {
+            marginTop: '20vh',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            backgroundColor: '#f6ffed',
+            border: '1px solid #b7eb8f',
+            borderRadius: '6px',
+            padding: '12px 16px'
+          }
+        });
+        
+        // Also show a simple success message as backup
+        message.success(response.message || 'File uploaded successfully!');
+        
+        // Show success confirmation modal
+        setSuccessMessage(response.message || 'File uploaded successfully!');
+        setShowSuccessAlert(true);
+        setShowConfirmationModal(true);
       } else {
-        message.error(response.data.message || 'Upload failed');
+        console.log('Failed! Showing error message:', response.message);
+        message.error({
+          content: response.message || 'Upload failed',
+          duration: 5,
+          style: {
+            marginTop: '20vh',
+            fontSize: '16px'
+          }
+        });
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -163,16 +211,56 @@ const UploadFile = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card title="Upload Document" className="shadow-md">
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          initialValues={{
-            user_id: 'nitin'
-          }}
-        >
+    <>
+
+      <div className="max-w-4xl mx-auto">
+        <Card title="Upload Document" className="shadow-md">
+                 <Form
+           form={form}
+           layout="vertical"
+           onFinish={handleSubmit}
+           initialValues={{
+             user_id: 'nitin'
+           }}
+         >
+                       {/* Success Alert */}
+            {showSuccessAlert && (
+              <Alert
+                message="Success!"
+                description={successMessage}
+                type="success"
+                showIcon
+                closable
+                className="mb-6"
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}
+              />
+            )}
+            
+            {/* Success Confirmation Modal */}
+            <ConfirmationModal
+              visible={showConfirmationModal}
+              title="Document Uploaded Successfully!"
+              content={
+                <div className="text-center py-4">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <p className="text-lg text-gray-700 mb-2">
+                    {successMessage}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Your document has been successfully uploaded to the system.
+                  </p>
+                </div>
+              }
+              type="success"
+              onConfirm={handleConfirmSuccess}
+              onCancel={handleCancelSuccess}
+              confirmText="Upload Another"
+              cancelText="Close"
+              showSuccessMessage={false}
+            />
           {/* File Upload Section */}
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-3">Select File</h3>
@@ -182,6 +270,7 @@ const UploadFile = () => {
               beforeUpload={() => false} // Prevent auto upload
               maxCount={1}
               accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.tiff"
+              customRequest={() => {}} // Ensure no custom upload logic
             >
               <Button icon={<UploadOutlined />} size="large">
                 Choose File
@@ -276,13 +365,13 @@ const UploadFile = () => {
               <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Tags:</h4>
               <div className="flex flex-wrap gap-2">
                 {existingTags.map((tag, index) => (
-                  <button
+                  <span
                     key={index}
                     onClick={() => addExistingTag(tag)}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-sm"
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-sm cursor-pointer"
                   >
                     + {tag}
-                  </button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -297,7 +386,7 @@ const UploadFile = () => {
                 className="max-w-xs"
               />
               <Button 
-                type="primary" 
+                type="button"
                 icon={<PlusOutlined />} 
                 onClick={addTag}
                 disabled={!newTag.trim()}
@@ -317,6 +406,7 @@ const UploadFile = () => {
                   >
                     <span>{tag}</span>
                     <button
+                      type="button"
                       onClick={() => removeTag(tag)}
                       className="text-blue-600 hover:text-blue-800"
                     >
@@ -328,21 +418,25 @@ const UploadFile = () => {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              loading={loading}
-              className="w-full md:w-auto"
-            >
-              {loading ? 'Uploading...' : 'Upload Document'}
-            </Button>
-          </Form.Item>
+                      {/* Submit Button */}
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                size="large"
+                loading={loading}
+                className="w-full md:w-auto"
+                onClick={() => console.log('Upload button clicked - form will submit')}
+              >
+                {loading ? 'Uploading...' : 'Upload Document'}
+              </Button>
+              
+
+            </Form.Item>
         </Form>
       </Card>
     </div>
+    </>
   );
 };
 

@@ -115,11 +115,22 @@ const Login = () => {
         // Store user data if available
         if (response.token) {
           localStorage.setItem('authToken', response.token);
+        } else if (response.data?.token) {
+          localStorage.setItem('authToken', response.data.token);
+        } else if (response.access_token) {
+          localStorage.setItem('authToken', response.access_token);
+        } else {
+          console.warn('No token found in response:', response);
         }
+        
         if (response.user) {
           localStorage.setItem('userData', JSON.stringify(response.user));
         }
         localStorage.setItem('userMobile', values.mobileNumber);
+        
+        // Debug: Log what we're storing
+        console.log('Login response:', response);
+        console.log('Stored token:', localStorage.getItem('authToken'));
         
         // Show custom success notification for login
         notification.success({

@@ -25,24 +25,7 @@ const UploadFile = () => {
   const [dropdownOptions, setDropdownOptions] = useState({});
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // Fallback hardcoded options in case API fails
-  const fallbackOptions = {
-    'Personal': [
-      { value: 'John', label: 'John' },
-      { value: 'Tom', label: 'Tom' },
-      { value: 'Emily', label: 'Emily' },
-      { value: 'Sarah', label: 'Sarah' },
-      { value: 'Mike', label: 'Mike' }
-    ],
-    'Professional': [
-      { value: 'Accounts', label: 'Accounts' },
-      { value: 'HR', label: 'HR' },
-      { value: 'IT', label: 'IT' },
-      { value: 'Finance', label: 'Finance' },
-      { value: 'Marketing', label: 'Marketing' },
-      { value: 'Sales', label: 'Sales' }
-    ]
-  };
+
 
   // Fetch existing tags and dropdown options from API
   useEffect(() => {
@@ -54,9 +37,6 @@ const UploadFile = () => {
   useEffect(() => {
     if (category && dropdownOptions[category]) {
       setSubOptions(dropdownOptions[category]);
-    } else if (category && fallbackOptions[category]) {
-      // Fallback to hardcoded options if API options not available
-      setSubOptions(fallbackOptions[category]);
     } else {
       setSubOptions([]);
     }
@@ -77,15 +57,14 @@ const UploadFile = () => {
         setDropdownOptions(response.data);
         message.success('Dropdown options updated successfully');
       } else {
-        console.warn('No dropdown options received from API, using fallback options');
-        setDropdownOptions(fallbackOptions);
-        message.warning('Using fallback dropdown options');
+        console.warn('No dropdown options received from API');
+        setDropdownOptions({});
+        message.warning('No dropdown options available');
       }
     } catch (error) {
       console.error('Error fetching dropdown options:', error);
-      console.log('Using fallback dropdown options due to error');
-      setDropdownOptions(fallbackOptions);
-      message.error('Failed to fetch dropdown options, using fallback options');
+      setDropdownOptions({});
+      message.error('Failed to fetch dropdown options');
     } finally {
       setLoadingDropdowns(false);
     }

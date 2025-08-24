@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { SearchOutlined, ClearOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Input, DatePicker, Select, Card, Form, Space, Tag, Table, message } from 'antd';
-import { searchDocumentTags, searchDocumentEntry } from '../coreApi/upload file/uploadfileApi';
+import { SearchOutlined, ClearOutlined, FileTextOutlined, UserOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, FilePdfOutlined, FileUnknownOutlined } from '@ant-design/icons';
+import { Button, Input, DatePicker, Select, Card, Form, Space, Tag, Table, message, Modal, Tooltip } from 'antd';
+import { searchDocumentTags, searchDocumentEntry, downloadDocument } from '../coreApi/upload file/uploadfileApi';
+import JSZip from 'jszip';
+import { API_CONFIG } from '../config/config';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -138,17 +140,21 @@ const FileSearch = () => {
       const response = await searchDocumentEntry(searchParams);
       
       if (response.status === true) {
-        setSearchResults(response.documents || response.data || []);
+        // API returns data array, not documents
+        const documents = response.data || [];
+        setSearchResults(documents);
+        
+        // Use recordsTotal for pagination total
         setPagination({
           current: page,
           pageSize: pageSize,
-          total: response.total || response.documents?.length || 0
+          total: response.recordsTotal || response.total || documents.length || 0
         });
         
-        if ((response.documents || response.data || []).length === 0) {
+        if (documents.length === 0) {
           message.info('No documents found matching your search criteria.');
         } else {
-          message.success(`Found ${(response.documents || response.data || []).length} document(s)`);
+          message.success(`Found ${documents.length} document(s)`);
         }
       } else {
         message.error(response.message || 'Search failed');
@@ -160,24 +166,20 @@ const FileSearch = () => {
       // Mock data for demonstration (remove this in production)
       setSearchResults([
         {
-          id: 1,
-          filename: 'work_order_2024.pdf',
+          document_id: 25,
           major_head: 'Professional',
           minor_head: 'IT',
-          document_date: '15-02-2024',
-          tags: ['RMC', '2024', 'work_order'],
-          remarks: 'IT infrastructure work order for Q1 2024',
-          uploaded_by: 'john.doe@company.com'
+          document_date: '2024-02-01T00:00:00',
+          document_remarks: 'IT infrastructure work order for Q1 2024',
+          uploaded_by: 'Sagar'
         },
         {
-          id: 2,
-          filename: 'personal_contract.pdf',
-          major_head: 'Personal',
-          minor_head: 'John',
-          document_date: '10-02-2024',
-          tags: ['contract', 'personal'],
-          remarks: 'Personal service contract agreement',
-          uploaded_by: 'john.smith@company.com'
+          document_id: 6,
+          major_head: 'Company',
+          minor_head: 'Work Order',
+          document_date: '2024-02-12T00:00:00',
+          document_remarks: 'Test Remarks',
+          uploaded_by: 'nitin'
         }
       ]);
     } finally {
@@ -205,16 +207,285 @@ const FileSearch = () => {
     });
   };
 
+  // File preview functionality
+  const handleFilePreview = (fileUrl, fileName) => {
+    if (!fileUrl) {
+      message.error('File URL not available');
+      return;
+    }
+
+    const fileExtension = fileName?.split('.').pop()?.toLowerCase();
+    
+    // Check if it's an image
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+      Modal.info({
+        title: `Preview: ${fileName}`,
+        width: 800,
+        content: (
+          <div className="text-center">
+            <img 
+              src={fileUrl} 
+              alt={fileName} 
+              className="max-w-full max-h-96 object-contain mx-auto"
+              onError={() => message.error('Failed to load image preview')}
+            />
+          </div>
+        ),
+        okText: 'Close'
+      });
+    } 
+    // Check if it's a PDF
+    else if (fileExtension === 'pdf') {
+      Modal.info({
+        title: `PDF Preview: ${fileName}`,
+        width: 1000,
+        content: (
+          <div className="text-center">
+            <iframe
+              src={fileUrl}
+              width="100%"
+              height="600"
+              title={fileName}
+              className="border border-gray-300"
+            />
+          </div>
+        ),
+        okText: 'Close'
+      });
+    } 
+    // Unsupported file types
+    else {
+      Modal.info({
+        title: 'File Preview Not Available',
+        content: (
+          <div className="text-center">
+            <FileUnknownOutlined className="text-4xl text-gray-400 mb-4" />
+            <p>Preview is not available for {fileExtension?.toUpperCase()} files.</p>
+            <p className="text-sm text-gray-500 mt-2">Please download the file to view it.</p>
+          </div>
+        ),
+        okText: 'Close'
+      });
+    }
+  };
+
+  // Download individual file
+  const handleDownloadFile = async (fileUrl, fileName) => {
+    if (!fileUrl) {
+      message.error('File URL not available');
+      return;
+    }
+
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName || 'document';
+      link.target = '_blank';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      message.success(`Downloading ${fileName}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      message.error('Download failed. Please try again.');
+    }
+  };
+
+  // Download all files as ZIP via server
+  const handleDownloadAllAsZip = async () => {
+    if (searchResults.length === 0) {
+      message.warning('No files to download');
+      return;
+    }
+
+    // Get document IDs for files that have URLs
+    const documentIds = searchResults
+      .filter(doc => doc.file_url)
+      .map(doc => doc.document_id);
+
+    if (documentIds.length === 0) {
+      message.warning('No files available for download');
+      return;
+    }
+
+    try {
+      message.loading('Preparing ZIP file for download...', 0);
+      
+      // Call your backend API to create the ZIP
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/create-zip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ documentIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Server error creating ZIP file');
+      }
+
+      // Get the ZIP file from the response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `documents_${new Date().toISOString().split('T')[0]}.zip`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      message.destroy();
+      message.success('ZIP file downloaded successfully');
+    } catch (error) {
+      message.destroy();
+      console.error('ZIP download error:', error);
+      message.error('Failed to download ZIP file. Please try again.');
+    }
+  };
+
+  // Attempt to create ZIP file
+  const attemptZipCreation = async (filesWithUrls) => {
+    try {
+      message.loading('Creating ZIP file...', 0);
+      
+      const zip = new JSZip();
+      const downloadPromises = filesWithUrls.map(async (doc) => {
+        try {
+          // Try to fetch the file content
+          const response = await fetch(doc.file_url, {
+            mode: 'cors', // Try CORS mode
+            credentials: 'omit' // Don't send credentials
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${doc.file_url} - Status: ${response.status}`);
+          }
+          
+          const blob = await response.blob();
+          
+          // Create a meaningful filename
+          const fileExtension = doc.file_url.split('.').pop() || 'file';
+          const fileName = `${doc.major_head}_${doc.minor_head}_${doc.document_id}.${fileExtension}`;
+          
+          // Add file to ZIP
+          zip.file(fileName, blob);
+          
+          return fileName;
+        } catch (error) {
+          console.error(`Error processing file ${doc.document_id}:`, error);
+          return null;
+        }
+      });
+
+      // Wait for all files to be processed
+      const processedFiles = await Promise.all(downloadPromises);
+      const successfulFiles = processedFiles.filter(file => file !== null);
+
+      if (successfulFiles.length === 0) {
+        message.destroy();
+        message.error('Failed to process any files for ZIP download due to CORS restrictions. Please use individual downloads.');
+        return;
+      }
+
+      // Generate ZIP file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      // Create download link for ZIP
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `documents_${new Date().toISOString().split('T')[0]}.zip`;
+      link.target = '_blank';
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(link.href);
+      
+      message.destroy();
+      message.success(`ZIP file created with ${successfulFiles.length} files`);
+      
+    } catch (error) {
+      message.destroy();
+      console.error('ZIP creation error:', error);
+      message.error('ZIP creation failed due to CORS restrictions. Please use individual downloads.');
+    }
+  };
+
+  // Download files individually
+  const downloadFilesIndividually = (filesWithUrls) => {
+    message.info(`Starting download of ${filesWithUrls.length} files individually...`);
+    
+    // Stagger downloads to avoid browser blocking
+    filesWithUrls.forEach((doc, index) => {
+      setTimeout(() => {
+        if (doc.file_url) {
+          const link = document.createElement('a');
+          link.href = doc.file_url;
+          const fileExtension = doc.file_url.split('.').pop() || 'file';
+          link.download = `${doc.major_head}_${doc.minor_head}_${doc.document_id}.${fileExtension}`;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }, index * 500); // 500ms delay between downloads
+    });
+    
+    message.success(`Initiating download of ${filesWithUrls.length} files. Check your downloads folder.`);
+  };
+
+  // Get file icon based on file type
+  const getFileIcon = (fileUrl) => {
+    if (!fileUrl) return <FileUnknownOutlined className="text-gray-400" />;
+    
+    const fileExtension = fileUrl.split('.').pop()?.toLowerCase();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+      return <FileImageOutlined className="text-green-500" />;
+    } else if (fileExtension === 'pdf') {
+      return <FilePdfOutlined className="text-red-500" />;
+    } else {
+      return <FileTextOutlined className="text-blue-500" />;
+    }
+  };
+
   // Table columns for search results
   const columns = [
     {
-      title: 'File Name',
-      dataIndex: 'filename',
-      key: 'filename',
-      render: (text) => (
+      title: 'Document ID',
+      dataIndex: 'document_id',
+      key: 'document_id',
+      render: (id) => (
         <div className="flex items-center">
           <FileTextOutlined className="text-blue-500 mr-2" />
-          <span className="font-medium">{text}</span>
+          <span className="font-medium">#{id}</span>
+        </div>
+      )
+    },
+    {
+      title: 'File',
+      dataIndex: 'file_url',
+      key: 'file_url',
+      render: (fileUrl, record) => (
+        <div className="flex items-center">
+          {getFileIcon(fileUrl)}
+          <span className="ml-2 text-sm text-gray-600">
+            {fileUrl ? 'File Available' : 'No File'}
+          </span>
         </div>
       )
     },
@@ -223,7 +494,7 @@ const FileSearch = () => {
       dataIndex: 'major_head',
       key: 'major_head',
       render: (text) => (
-        <Tag color={text === 'Personal' ? 'green' : 'blue'}>
+        <Tag color={text === 'Personal' ? 'green' : text === 'Professional' ? 'blue' : 'purple'}>
           {text}
         </Tag>
       )
@@ -237,6 +508,18 @@ const FileSearch = () => {
       title: 'Date',
       dataIndex: 'document_date',
       key: 'document_date',
+      render: (date) => {
+        if (!date) return 'N/A';
+        try {
+          return new Date(date).toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch {
+          return date;
+        }
+      }
     },
     {
       title: 'Uploaded By',
@@ -250,24 +533,37 @@ const FileSearch = () => {
       )
     },
     {
-      title: 'Tags',
-      dataIndex: 'tags',
-      key: 'tags',
-      render: (tags) => (
-        <div className="flex flex-wrap gap-1">
-          {tags?.map((tag, index) => (
-            <Tag key={index} color="orange" size="small">
-              {tag}
-            </Tag>
-          ))}
-        </div>
-      )
+      title: 'Remarks',
+      dataIndex: 'document_remarks',
+      key: 'document_remarks',
+      ellipsis: true,
+      render: (text) => text || 'No remarks'
     },
     {
-      title: 'Remarks',
-      dataIndex: 'remarks',
-      key: 'remarks',
-      ellipsis: true,
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <div className="flex gap-2">
+          <Tooltip title="Preview File">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              size="small"
+              onClick={() => handleFilePreview(record.file_url, `${record.major_head}_${record.minor_head}_${record.document_id}`)}
+              disabled={!record.file_url}
+            />
+          </Tooltip>
+          <Tooltip title="Download File">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              size="small"
+              onClick={() => handleDownloadFile(record.file_url, `${record.major_head}_${record.minor_head}_${record.document_id}`)}
+              disabled={!record.file_url}
+            />
+          </Tooltip>
+        </div>
+      )
     }
   ];
 
@@ -442,11 +738,26 @@ const FileSearch = () => {
 
       {/* Search Results */}
       {searchResults.length > 0 && (
-        <Card title={`Search Results (${searchResults.length} documents)`} className="shadow-md">
+        <Card 
+          title={`Search Results (${searchResults.length} documents)`} 
+          className="shadow-md"
+          extra={
+            <Tooltip title="Download all files (handles CORS issues automatically)">
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadAllAsZip}
+                disabled={searchResults.filter(doc => doc.file_url).length === 0}
+              >
+                Download All Files
+              </Button>
+            </Tooltip>
+          }
+        >
           <Table
             columns={columns}
             dataSource={searchResults}
-            rowKey="id"
+            rowKey="document_id"
             pagination={{
               current: pagination.current,
               pageSize: pagination.pageSize,

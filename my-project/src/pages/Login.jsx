@@ -1,102 +1,48 @@
 import React, { useState } from 'react';
-import { EyeIcon, EyeSlashIcon, PhoneIcon, KeyIcon } from '@heroicons/react/24/outline';
-import { message, notification } from 'antd';
+import { EyeInvisibleOutlined, EyeTwoTone, MobileOutlined, KeyOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, notification, Typography, Spin } from 'antd';
+
+const { Title, Text } = Typography;
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [form] = Form.useForm();
   
-  // Login form state
-  const [loginForm, setLoginForm] = useState({
-    mobileNumber: '',
-    otp: ''
-  });
+  // Form validation rules
+  const mobileRules = [
+    { required: true, message: 'Mobile number is required' },
+    { pattern: /^[6-9]\d{9}$/, message: 'Please enter a valid 10-digit mobile number' }
+  ];
   
-  // Form validation errors
-  const [errors, setErrors] = useState({});
-  
-  // Handle login form input changes
-  const handleLoginChange = (e) => {
-    const { name, value } = e.target;
-    setLoginForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-  
-  // Validate mobile number format
-  const validateMobileNumber = (mobile) => {
-    const mobileRegex = /^[6-9]\d{9}$/;
-    return mobileRegex.test(mobile);
-  };
-  
-  // Validate OTP format
-  const validateOTP = (otp) => {
-    const otpRegex = /^\d{6}$/;
-    return otpRegex.test(otp);
-  };
+  const otpRules = [
+    { required: true, message: 'OTP is required' },
+    { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
+  ];
   
   // Generate OTP (UI only - no API call)
-  const handleGenerateOTP = () => {
-    const mobile = loginForm.mobileNumber.trim();
-    
-    if (!mobile) {
-      setErrors({ mobileNumber: 'Mobile number is required' });
-      return;
+  const handleGenerateOTP = async () => {
+    try {
+      await form.validateFields(['mobileNumber']);
+      const mobile = form.getFieldValue('mobileNumber');
+      
+      // Simulate loading
+      setIsLoading(true);
+      
+      // Simulate API delay
+      setTimeout(() => {
+        setShowOTP(true);
+        setIsLoading(false);
+        message.success('OTP sent successfully to your mobile number!');
+      }, 1500);
+    } catch (error) {
+      // Validation errors will be shown automatically
     }
-    
-    if (!validateMobileNumber(mobile)) {
-      setErrors({ mobileNumber: 'Please enter a valid 10-digit mobile number' });
-      return;
-    }
-    
-    // Simulate loading
-    setIsLoading(true);
-    
-    // Simulate API delay
-    setTimeout(() => {
-      setShowOTP(true);
-      setIsLoading(false);
-      message.success('OTP sent successfully to your mobile number!');
-    }, 1500);
   };
   
-  
-  const handleLogin = (e) => {
-    e.preventDefault();
-    
-    const mobile = loginForm.mobileNumber.trim();
-    const otp = loginForm.otp.trim();
-    
-    // Validation
-    const newErrors = {};
-    
-    if (!mobile) {
-      newErrors.mobileNumber = 'Mobile number is required';
-    } else if (!validateMobileNumber(mobile)) {
-      newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
-    }
-    
-    if (!otp) {
-      newErrors.otp = 'OTP is required';
-    } else if (!validateOTP(otp)) {
-      newErrors.otp = 'Please enter a valid 6-digit OTP';
-    }
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-    
+  // Handle login submission
+  const handleLogin = async (values) => {
     // Simulate loading
     setIsLoading(true);
     
@@ -106,136 +52,121 @@ const Login = () => {
       
       // Simulate successful login
       localStorage.setItem('demoAuthToken', 'demo-token-123');
-      localStorage.setItem('demoUserMobile', mobile);
+      localStorage.setItem('demoUserMobile', values.mobileNumber);
       
-             notification.success({
-         message: 'Login Successful!',
-         description: 'Welcome to Document Management System.',
-         placement: 'topRight',
-         duration: 4.5
-       });
+      notification.success({
+        message: 'Login Successful!',
+        description: 'Welcome to Document Management System.',
+        placement: 'topRight',
+        duration: 4.5
+      });
       
       // Reset form
-      setLoginForm({
-        mobileNumber: '',
-        otp: ''
-      });
+      form.resetFields();
       setShowOTP(false);
     }, 1500);
   };
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center ">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <Title level={2} className="!mb-2 text-gray-800">
             Document Management System
-          </h1>
-          <p className="text-gray-600">
+          </Title>
+          <Text type="secondary" className="text-gray-600">
             Secure access to your documents
-          </p>
+          </Text>
         </div>
         
         {/* Login Form */}
-        <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+        <Card className="rounded-xl shadow-lg border-0">
+          <div className="text-center mb-6">
+            <Title level={4} className="!mb-1 text-gray-800">
               Login with OTP
-            </h2>
-            <p className="text-sm text-gray-600">
+            </Title>
+            <Text type="secondary" className="text-sm">
               Enter your mobile number to receive OTP
-            </p>
+            </Text>
           </div>
           
-          <form onSubmit={handleLogin} className="space-y-4">
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleLogin}
+            className="space-y-4"
+          >
             {/* Mobile Number Input */}
-            <div>
-              <label htmlFor="mobileNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                Mobile Number
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <PhoneIcon className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="tel"
-                  id="mobileNumber"
-                  name="mobileNumber"
-                  value={loginForm.mobileNumber}
-                  onChange={handleLoginChange}
-                  placeholder="Enter your mobile number"
-                  className={`block w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.mobileNumber ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  maxLength="10"
-                />
-              </div>
-              {errors.mobileNumber && (
-                <p className="mt-1 text-sm text-red-600">{errors.mobileNumber}</p>
-              )}
-            </div>
+            <Form.Item
+              name="mobileNumber"
+              label="Mobile Number"
+              rules={mobileRules}
+            >
+              <Input
+                prefix={<MobileOutlined className="text-gray-400" />}
+                placeholder="Enter your mobile number"
+                size="large"
+                maxLength={10}
+                disabled={isLoading}
+              />
+            </Form.Item>
             
             {/* Generate OTP Button */}
-            <button
-              type="button"
+            <Button
+              type="primary"
+              size="large"
               onClick={handleGenerateOTP}
-              disabled={isLoading || !loginForm.mobileNumber.trim()}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={isLoading}
+              loading={isLoading}
+              block
             >
-              {isLoading ? 'Sending OTP...' : 'Generate OTP'}
-            </button>
+              Generate OTP
+            </Button>
             
             {/* OTP Input (shown after OTP is generated) */}
             {showOTP && (
-              <div>
-                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
-                  Enter OTP
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <KeyIcon className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    id="otp"
-                    name="otp"
-                    value={loginForm.otp}
-                    onChange={handleLoginChange}
-                    placeholder="Enter 6-digit OTP"
-                    className={`block w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.otp ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    maxLength="6"
-                  />
-                </div>
-                {errors.otp && (
-                  <p className="mt-1 text-sm text-red-600">{errors.otp}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Enter the 6-digit OTP sent to your mobile number
-                </p>
-              </div>
+              <Form.Item
+                name="otp"
+                label="Enter OTP"
+                rules={otpRules}
+                extra="Enter the 6-digit OTP sent to your mobile number"
+              >
+                <Input.Password
+                  prefix={<KeyOutlined className="text-gray-400" />}
+                  placeholder="Enter 6-digit OTP"
+                  size="large"
+                  disabled={isLoading}
+                  iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+                />
+              </Form.Item>
             )}
             
             {/* Login Button */}
             {showOTP && (
-              <button
-                type="submit"
-                disabled={isLoading || !loginForm.otp.trim()}
-                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              <Button
+                type="primary"
+                htmlType="submit"
+                size="large"
+                loading={isLoading}
+                block
+                className="bg-green-600 hover:bg-green-700 border-green-600"
               >
-                {isLoading ? 'Logging in...' : 'Login'}
-              </button>
+                Login
+              </Button>
             )}
-          </form>
-         
-        </div>
+          </Form>
+        </Card>
         
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500">
-          <p>Document Management System © 2024</p>
-          <p className="mt-1">Allsoft Front-End Developer Assignment</p>
+        <div className="text-center">
+          <Text type="secondary" className="text-sm">
+            Document Management System © 2024
+          </Text>
+          <br />
+          <Text type="secondary" className="text-xs">
+            Allsoft Front-End Developer Assignment
+          </Text>
         </div>
       </div>
     </div>

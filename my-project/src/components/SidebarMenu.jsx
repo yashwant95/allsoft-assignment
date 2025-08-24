@@ -16,6 +16,7 @@ import {
   faFolder,
   faSearch,
   faChartBar,
+  faUpload,
 } from "@fortawesome/free-solid-svg-icons";
 
 const SidebarMenu = ({ isOpen }) => {
@@ -30,6 +31,17 @@ const SidebarMenu = ({ isOpen }) => {
       path: "/dashboard",
       icon: faTachometerAlt,
       label: "Dashboard",
+    },
+    {
+      path: "/upload",
+      icon: faUpload,
+      label: "Upload File",
+    },
+
+    {
+      path: "/search",
+      icon: faSearch,
+      label: "Search",
     },
    
   ];

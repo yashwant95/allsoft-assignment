@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { EyeIcon, EyeSlashIcon, PhoneIcon, KeyIcon } from '@heroicons/react/24/outline';
+import { message, notification } from 'antd';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -65,11 +66,11 @@ const Login = () => {
     setTimeout(() => {
       setShowOTP(true);
       setIsLoading(false);
-      alert('OTP sent successfully to your mobile number! (Demo Mode)');
+      message.success('OTP sent successfully to your mobile number!');
     }, 1500);
   };
   
-  // Validate OTP and login (UI only - no API call)
+  
   const handleLogin = (e) => {
     e.preventDefault();
     
@@ -107,7 +108,12 @@ const Login = () => {
       localStorage.setItem('demoAuthToken', 'demo-token-123');
       localStorage.setItem('demoUserMobile', mobile);
       
-      alert('Login successful! Welcome to Document Management System. (Demo Mode)');
+             notification.success({
+         message: 'Login Successful!',
+         description: 'Welcome to Document Management System.',
+         placement: 'topRight',
+         duration: 4.5
+       });
       
       // Reset form
       setLoginForm({

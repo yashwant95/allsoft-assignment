@@ -52,7 +52,38 @@ export const validateOTP = async (mobileNumber, otp) => {
   }
 };
 
+// Logout function
+export const logout = async () => {
+  try {
+    // Clear local storage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('userMobile');
+    
+    // You can add an API call here if your backend requires logout confirmation
+    // const config = {
+    //   method: 'post',
+    //   url: `${API_CONFIG.BASE_URL}/api/documentManagement/logout`,
+    //   headers: { 
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+    //   }
+    // };
+    // await axios.request(config);
+    
+    return { success: true, message: 'Logged out successfully' };
+  } catch (error) {
+    console.error('Error during logout:', error);
+    // Even if API call fails, clear local storage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('userMobile');
+    throw error;
+  }
+};
+
 export default {
   generateOTP,
-  validateOTP
+  validateOTP,
+  logout
 };

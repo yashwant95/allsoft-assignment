@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SearchOutlined, ClearOutlined, FileTextOutlined, UserOutlined, DownloadOutlined, EyeOutlined, FileImageOutlined, FilePdfOutlined, FileUnknownOutlined } from '@ant-design/icons';
 import { Button, Input, DatePicker, Select, Card, Form, Space, Tag, Table, message, Modal, Tooltip } from 'antd';
-import { searchDocumentTags, searchDocumentEntry, downloadDocument } from '../coreApi/upload file/uploadfileApi';
+import { searchDocumentTags, searchDocumentEntry, downloadDocument, getDropdownOptions } from '../coreApi/upload file/uploadfileApi';
 import JSZip from 'jszip';
 import { API_CONFIG } from '../config/config';
 
@@ -22,78 +22,61 @@ const FileSearch = () => {
     pageSize: 10,
     total: 0
   });
+  const [dropdownOptions, setDropdownOptions] = useState({});
+  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
+  const [loadingTags, setLoadingTags] = useState(true);
 
-  // Pre-defined options for dropdowns (same as UploadFile for consistency)
-  const categoryOptions = [
-    { value: 'Personal', label: 'Personal' },
-    { value: 'Professional', label: 'Professional' }
-  ];
-
-  const personalOptions = [
-    { value: 'John', label: 'John' },
-    { value: 'Tom', label: 'Tom' },
-    { value: 'Emily', label: 'Emily' },
-    { value: 'Sarah', label: 'Sarah' },
-    { value: 'Mike', label: 'Mike' }
-  ];
-
-  const professionalOptions = [
-    { value: 'Accounts', label: 'Accounts' },
-    { value: 'HR', label: 'HR' },
-    { value: 'IT', label: 'IT' },
-    { value: 'Finance', label: 'Finance' },
-    { value: 'Marketing', label: 'Marketing' },
-    { value: 'Sales', label: 'Sales' }
-  ];
-
-  // Fetch existing tags from API
+  // Fetch existing tags and dropdown options from API
   useEffect(() => {
-    console.log('FileSearch component mounted, fetching tags...'); // Debug log
     fetchExistingTags();
+    fetchDropdownOptions();
   }, []);
-
-  // Debug log when existingTags state changes
-  useEffect(() => {
-    console.log('existingTags state updated:', existingTags); // Debug log
-  }, [existingTags]);
 
   // Update sub-options when category changes
   useEffect(() => {
-    if (category === 'Personal') {
-      setSubOptions(personalOptions);
-    } else if (category === 'Professional') {
-      setSubOptions(professionalOptions);
+    if (category && dropdownOptions[category]) {
+      setSubOptions(dropdownOptions[category]);
     } else {
       setSubOptions([]);
     }
     // Reset minor_head when category changes
     form.setFieldsValue({ minor_head: undefined });
-  }, [category, form]);
+  }, [category, dropdownOptions, form]);
+
+  const fetchDropdownOptions = async () => {
+    try {
+      setLoadingDropdowns(true);
+      const response = await getDropdownOptions();
+      
+      if (response.status === true && response.data && Object.keys(response.data).length > 0) {
+        setDropdownOptions(response.data);
+      } else {
+        setDropdownOptions({});
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown options:', error);
+      setDropdownOptions({});
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
 
   const fetchExistingTags = async () => {
     try {
-      // Use searchDocumentTags with empty string to get all available tags
+      setLoadingTags(true);
       const response = await searchDocumentTags("");
       
-      console.log('Tags API response:', response); // Debug log
-      
       if (response.status === true) {
-        // The API returns tags in response.data with id and label properties
-        const tags = response.data || [];
-        console.log('Extracted tags:', tags); // Debug log
-        
-        // Extract the label from each tag object
-        const tagLabels = tags.map(tag => tag.label || tag.id || tag);
-        setExistingTags(tagLabels);
+        const tags = response.data?.map(item => item.label) || [];
+        setExistingTags(tags);
       } else {
-        console.log('Tags API returned false status:', response);
-        // Fallback to some default tags if API fails
-        setExistingTags(['RMC', '2024', 'work_order', 'important', 'urgent', 'invoice', 'contract']);
+        setExistingTags([]);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
-      // Fallback to some default tags if API fails
-      setExistingTags(['RMC', '2024', 'work_order', 'important', 'urgent', 'invoice', 'contract']);
+      setExistingTags([]);
+    } finally {
+      setLoadingTags(false);
     }
   };
 
@@ -205,6 +188,9 @@ const FileSearch = () => {
       pageSize: 10,
       total: 0
     });
+    // Refresh dropdown options and tags
+    fetchDropdownOptions();
+    fetchExistingTags();
   };
 
   // File preview functionality
@@ -578,29 +564,47 @@ const FileSearch = () => {
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Category Selection */}
-            <Form.Item label="Category">
+            <Form.Item
+              label={
+                <div className="flex items-center justify-between">
+                  <span>Category</span>
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={fetchDropdownOptions}
+                    loading={loadingDropdowns}
+                    className="p-0 h-auto"
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              }
+            >
               <Select
-                placeholder="Select category"
+                placeholder={loadingDropdowns ? "Loading categories..." : "Select category"}
                 value={category}
                 onChange={setCategory}
                 allowClear
                 className="w-full"
+                loading={loadingDropdowns}
+                disabled={loadingDropdowns}
               >
-                {categoryOptions.map(option => (
-                  <Option key={option.value} value={option.value}>
-                    {option.label}
+                {Object.keys(dropdownOptions).map(option => (
+                  <Option key={option} value={option}>
+                    {option}
                   </Option>
                 ))}
               </Select>
             </Form.Item>
 
             {/* Dynamic Second Dropdown */}
-            <Form.Item label={category === 'Personal' ? 'Name' : category === 'Professional' ? 'Department' : 'Sub Category'}>
+            <Form.Item label={category ? 'Sub Category' : 'Sub Category'}>
               <Select
-                placeholder={`Select ${category === 'Personal' ? 'name' : category === 'Professional' ? 'department' : 'option'}`}
-                disabled={!category}
+                placeholder={category ? `Select sub category` : 'Select category first'}
+                disabled={!category || loadingDropdowns}
                 allowClear
                 className="w-full"
+                loading={loadingDropdowns}
               >
                 {subOptions.map(option => (
                   <Option key={option.value} value={option.value}>
@@ -667,7 +671,12 @@ const FileSearch = () => {
             <div className="mb-3">
               <span className="text-xs text-gray-500 mr-2">Click to add:</span>
               <div className="flex flex-wrap gap-2">
-                {existingTags.length > 0 ? (
+                {loadingTags ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                    <span className="text-gray-400 text-xs">Loading tags...</span>
+                  </div>
+                ) : existingTags.length > 0 ? (
                   existingTags.map((tag, index) => (
                     <button
                       key={index}

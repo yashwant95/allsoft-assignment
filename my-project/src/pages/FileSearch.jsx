@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { SearchOutlined, ClearOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ClearOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Input, DatePicker, Select, Card, Form, Space, Tag, Table, message } from 'antd';
-import { getTags, searchDocuments } from '../coreApi/upload file/uploadfileApi';
+import { searchDocumentTags, searchDocumentEntry } from '../coreApi/upload file/uploadfileApi';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -15,6 +15,11 @@ const FileSearch = () => {
   const [subOptions, setSubOptions] = useState([]);
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState('');
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0
+  });
 
   // Pre-defined options for dropdowns (same as UploadFile for consistency)
   const categoryOptions = [
@@ -41,8 +46,14 @@ const FileSearch = () => {
 
   // Fetch existing tags from API
   useEffect(() => {
+    console.log('FileSearch component mounted, fetching tags...'); // Debug log
     fetchExistingTags();
   }, []);
+
+  // Debug log when existingTags state changes
+  useEffect(() => {
+    console.log('existingTags state updated:', existingTags); // Debug log
+  }, [existingTags]);
 
   // Update sub-options when category changes
   useEffect(() => {
@@ -59,10 +70,23 @@ const FileSearch = () => {
 
   const fetchExistingTags = async () => {
     try {
-      const response = await getTags();
+      // Use searchDocumentTags with empty string to get all available tags
+      const response = await searchDocumentTags("");
+      
+      console.log('Tags API response:', response); // Debug log
       
       if (response.status === true) {
-        setExistingTags(response.tags || []);
+        // The API returns tags in response.data with id and label properties
+        const tags = response.data || [];
+        console.log('Extracted tags:', tags); // Debug log
+        
+        // Extract the label from each tag object
+        const tagLabels = tags.map(tag => tag.label || tag.id || tag);
+        setExistingTags(tagLabels);
+      } else {
+        console.log('Tags API returned false status:', response);
+        // Fallback to some default tags if API fails
+        setExistingTags(['RMC', '2024', 'work_order', 'important', 'urgent', 'invoice', 'contract']);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -92,33 +116,39 @@ const FileSearch = () => {
   };
 
   // Handle search submission
-  const handleSearch = async (values) => {
+  const handleSearch = async (values, page = 1, pageSize = 10) => {
     setLoading(true);
     
     try {
-      // Prepare search parameters
+      // Prepare search parameters for the new API
       const searchParams = {
-        major_head: category || undefined,
-        minor_head: values.minor_head || undefined,
-        tags: tags.length > 0 ? tags : undefined,
-        from_date: values.date_range?.[0]?.format('DD-MM-YYYY') || undefined,
-        to_date: values.date_range?.[1]?.format('DD-MM-YYYY') || undefined
+        major_head: category || "",
+        minor_head: values.minor_head || "",
+        from_date: values.date_range?.[0]?.format('DD-MM-YYYY') || "",
+        to_date: values.date_range?.[1]?.format('DD-MM-YYYY') || "",
+        tags: tags.length > 0 ? tags : [],
+        uploaded_by: values.uploaded_by || "",
+        start: (page - 1) * pageSize,
+        length: pageSize,
+        filterId: values.filterId || "",
+        searchValue: values.searchValue || ""
       };
 
-      // Remove undefined values
-      Object.keys(searchParams).forEach(key => 
-        searchParams[key] === undefined && delete searchParams[key]
-      );
-
-      // Call the search API
-      const response = await searchDocuments(searchParams);
+      // Call the new search API
+      const response = await searchDocumentEntry(searchParams);
       
       if (response.status === true) {
-        setSearchResults(response.documents || []);
-        if (response.documents?.length === 0) {
+        setSearchResults(response.documents || response.data || []);
+        setPagination({
+          current: page,
+          pageSize: pageSize,
+          total: response.total || response.documents?.length || 0
+        });
+        
+        if ((response.documents || response.data || []).length === 0) {
           message.info('No documents found matching your search criteria.');
         } else {
-          message.success(`Found ${response.documents.length} document(s)`);
+          message.success(`Found ${(response.documents || response.data || []).length} document(s)`);
         }
       } else {
         message.error(response.message || 'Search failed');
@@ -136,7 +166,8 @@ const FileSearch = () => {
           minor_head: 'IT',
           document_date: '15-02-2024',
           tags: ['RMC', '2024', 'work_order'],
-          remarks: 'IT infrastructure work order for Q1 2024'
+          remarks: 'IT infrastructure work order for Q1 2024',
+          uploaded_by: 'john.doe@company.com'
         },
         {
           id: 2,
@@ -145,12 +176,19 @@ const FileSearch = () => {
           minor_head: 'John',
           document_date: '10-02-2024',
           tags: ['contract', 'personal'],
-          remarks: 'Personal service contract agreement'
+          remarks: 'Personal service contract agreement',
+          uploaded_by: 'john.smith@company.com'
         }
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle pagination change
+  const handleTableChange = (pagination, filters, sorter) => {
+    const values = form.getFieldsValue();
+    handleSearch(values, pagination.current, pagination.pageSize);
   };
 
   // Clear search
@@ -160,6 +198,11 @@ const FileSearch = () => {
     setSubOptions([]);
     setTags([]);
     setSearchResults([]);
+    setPagination({
+      current: 1,
+      pageSize: 10,
+      total: 0
+    });
   };
 
   // Table columns for search results
@@ -196,6 +239,17 @@ const FileSearch = () => {
       key: 'document_date',
     },
     {
+      title: 'Uploaded By',
+      dataIndex: 'uploaded_by',
+      key: 'uploaded_by',
+      render: (text) => (
+        <div className="flex items-center">
+          <UserOutlined className="text-gray-400 mr-1" />
+          <span className="text-sm">{text || 'N/A'}</span>
+        </div>
+      )
+    },
+    {
       title: 'Tags',
       dataIndex: 'tags',
       key: 'tags',
@@ -226,7 +280,7 @@ const FileSearch = () => {
           layout="vertical"
           onFinish={handleSearch}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Category Selection */}
             <Form.Item label="Category">
               <Select
@@ -269,6 +323,32 @@ const FileSearch = () => {
               />
             </Form.Item>
 
+            {/* Uploaded By */}
+            <Form.Item name="uploaded_by" label="Uploaded By">
+              <Input
+                placeholder="Enter email or username"
+                prefix={<UserOutlined />}
+                className="w-full"
+              />
+            </Form.Item>
+
+            {/* Search Value */}
+            <Form.Item name="searchValue" label="Search Text">
+              <Input
+                placeholder="Search in document content"
+                prefix={<SearchOutlined />}
+                className="w-full"
+              />
+            </Form.Item>
+
+            {/* Filter ID */}
+            <Form.Item name="filterId" label="Filter ID">
+              <Input
+                placeholder="Enter filter ID (optional)"
+                className="w-full"
+              />
+            </Form.Item>
+
             {/* Search Button */}
             <Form.Item label=" " className="flex items-end">
               <Button
@@ -291,15 +371,19 @@ const FileSearch = () => {
             <div className="mb-3">
               <span className="text-xs text-gray-500 mr-2">Click to add:</span>
               <div className="flex flex-wrap gap-2">
-                {existingTags.map((tag, index) => (
-                  <button
-                    key={index}
-                    onClick={() => addExistingTag(tag)}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-xs"
-                  >
-                    + {tag}
-                  </button>
-                ))}
+                {existingTags.length > 0 ? (
+                  existingTags.map((tag, index) => (
+                    <button
+                      key={index}
+                      onClick={() => addExistingTag(tag)}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-xs"
+                    >
+                      + {tag}
+                    </button>
+                  ))
+                ) : (
+                  <span className="text-gray-400 text-xs">No tags available</span>
+                )}
               </div>
             </div>
 
@@ -364,11 +448,14 @@ const FileSearch = () => {
             dataSource={searchResults}
             rowKey="id"
             pagination={{
-              pageSize: 10,
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
               showSizeChanger: true,
               showQuickJumper: true,
               showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
             }}
+            onChange={handleTableChange}
             scroll={{ x: 800 }}
           />
         </Card>

@@ -106,7 +106,6 @@ export const searchDocumentTags = async (searchTerm = "") => {
       url: `${API_CONFIG.BASE_URL}/api/documentManagement/documentTags`,
       headers: { 
         'token': token,
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       data: {
@@ -115,7 +114,9 @@ export const searchDocumentTags = async (searchTerm = "") => {
     };
 
     console.log('Searching tags with term:', searchTerm || '(empty - will return all tags)');
+    console.log('Tags API request config:', config); // Debug log
     const response = await axios.request(config);
+    console.log('Tags API raw response:', response); // Debug log
     return response.data;
   } catch (error) {
     console.error('Error searching document tags:', error);
@@ -147,6 +148,56 @@ export const searchDocuments = async (searchParams) => {
       },
       data: searchParams
     };
+
+    const response = await axios.request(config);
+    return response.data;
+  } catch (error) {
+    console.error('Error searching documents:', error);
+    throw error;
+  }
+};
+
+// Search documents using searchDocumentEntry endpoint
+export const searchDocumentEntry = async (searchParams) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+      throw new Error('Authentication token not found. Please login again.');
+    }
+
+    // Prepare the request data structure as per the API specification
+    const requestData = {
+      major_head: searchParams.major_head || "",
+      minor_head: searchParams.minor_head || "",
+      from_date: searchParams.from_date || "",
+      to_date: searchParams.to_date || "",
+      tags: searchParams.tags ? searchParams.tags.map(tag => ({ tag_name: tag })) : [],
+      uploaded_by: searchParams.uploaded_by || "",
+      start: searchParams.start || 0,
+      length: searchParams.length || 10,
+      filterId: searchParams.filterId || "",
+      search: {
+        value: searchParams.searchValue || ""
+      }
+    };
+
+    const config = {
+      method: 'post',
+      maxBodyLength: Infinity,
+      url: `${API_CONFIG.BASE_URL}/api/documentManagement/searchDocumentEntry`,
+      headers: { 
+        'token': token,
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}`
+      },
+      data: requestData
+    };
+
+    console.log('Search request config:', {
+      url: config.url,
+      searchParams: requestData
+    });
 
     const response = await axios.request(config);
     return response.data;
@@ -269,6 +320,7 @@ export default {
   searchDocumentTags,
   getAllDocumentTags,
   searchDocuments,
+  searchDocumentEntry,
   downloadDocument,
   deleteDocument,
   updateDocument,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UploadOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Input, DatePicker, Select, message, Card, Form, Space, Upload, Alert } from 'antd';
-import { uploadFile, getTags } from '../coreApi/upload file/uploadfileApi';
+import { uploadFile, getTags, searchDocumentTags } from '../coreApi/upload file/uploadfileApi';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const { TextArea } = Input;
@@ -19,6 +19,8 @@ const UploadFile = () => {
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [tagSearchTerm, setTagSearchTerm] = useState('');
+  const [searchingTags, setSearchingTags] = useState(false);
 
   // Pre-defined options for dropdowns
   const categoryOptions = [
@@ -63,10 +65,13 @@ const UploadFile = () => {
 
   const fetchExistingTags = async () => {
     try {
-      const response = await getTags();
+      // Use the new searchDocumentTags API with empty term to get all tags
+      const response = await searchDocumentTags("");
       
       if (response.status === true) {
-        setExistingTags(response.tags || []);
+        // Extract tag labels from the response data
+        const tags = response.data?.map(item => item.label) || [];
+        setExistingTags(tags);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -100,6 +105,46 @@ const UploadFile = () => {
     }
   };
 
+  // Search tags dynamically
+  const handleTagSearch = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      // If search term is empty, fetch all tags
+      await fetchExistingTags();
+      return;
+    }
+
+    try {
+      setSearchingTags(true);
+      const response = await searchDocumentTags(searchTerm);
+      
+      if (response.status === true) {
+        // Extract tag labels from the response data
+        const tags = response.data?.map(item => item.label) || [];
+        setExistingTags(tags);
+      }
+    } catch (error) {
+      console.error('Error searching tags:', error);
+      // Fallback to all tags if search fails
+      await fetchExistingTags();
+    } finally {
+      setSearchingTags(false);
+    }
+  };
+
+  // Debounced search function
+  const debouncedTagSearch = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId;
+      return (searchTerm) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          handleTagSearch(searchTerm);
+        }, 300); // 300ms delay
+      };
+    }, []),
+    []
+  );
+
   // Handle confirmation modal confirm
   const handleConfirmSuccess = () => {
     setShowConfirmationModal(false);
@@ -111,6 +156,8 @@ const UploadFile = () => {
     setTags([]);
     setCategory('');
     setSubOptions([]);
+    setTagSearchTerm('');
+    fetchExistingTags(); // Refresh tags
   };
 
   // Handle confirmation modal cancel
@@ -124,6 +171,8 @@ const UploadFile = () => {
     setTags([]);
     setCategory('');
     setSubOptions([]);
+    setTagSearchTerm('');
+    fetchExistingTags(); // Refresh tags
   };
 
   // Handle form submission
@@ -360,19 +409,61 @@ const UploadFile = () => {
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-3">Tags</h3>
             
+            {/* Tag Search */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Search Existing Tags:</h4>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Search tags..."
+                  value={tagSearchTerm}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTagSearchTerm(value);
+                    debouncedTagSearch(value);
+                  }}
+                  className="max-w-xs"
+                  prefix={searchingTags ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div> : null}
+                />
+                <Button 
+                  type="button"
+                  onClick={() => handleTagSearch(tagSearchTerm)}
+                  loading={searchingTags}
+                  size="small"
+                >
+                  Search
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={() => {
+                    setTagSearchTerm('');
+                    fetchExistingTags();
+                  }}
+                  size="small"
+                >
+                  Show All
+                </Button>
+              </div>
+            </div>
+            
             {/* Existing Tags */}
             <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Tags:</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">
+                Existing Tags: {existingTags.length > 0 && `(${existingTags.length} found)`}
+              </h4>
               <div className="flex flex-wrap gap-2">
-                {existingTags.map((tag, index) => (
-                  <span
-                    key={index}
-                    onClick={() => addExistingTag(tag)}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-sm cursor-pointer"
-                  >
-                    + {tag}
-                  </span>
-                ))}
+                {existingTags.length > 0 ? (
+                  existingTags.map((tag, index) => (
+                    <span
+                      key={index}
+                      onClick={() => addExistingTag(tag)}
+                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors text-sm cursor-pointer"
+                    >
+                      + {tag}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No tags found. Try searching or adding a new tag.</p>
+                )}
               </div>
             </div>
 

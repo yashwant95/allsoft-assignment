@@ -91,6 +91,43 @@ export const getTags = async () => {
   }
 };
 
+// Search document tags by term
+export const searchDocumentTags = async (searchTerm = "") => {
+  try {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+      throw new Error('Authentication token not found. Please login again.');
+    }
+
+    const config = {
+      method: 'post',
+      maxBodyLength: Infinity,
+      url: `${API_CONFIG.BASE_URL}/api/documentManagement/documentTags`,
+      headers: { 
+        'token': token,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        term: searchTerm
+      }
+    };
+
+    console.log('Searching tags with term:', searchTerm || '(empty - will return all tags)');
+    const response = await axios.request(config);
+    return response.data;
+  } catch (error) {
+    console.error('Error searching document tags:', error);
+    throw error;
+  }
+};
+
+// Get all available tags (alias for searchDocumentTags with empty term)
+export const getAllDocumentTags = async () => {
+  return searchDocumentTags("");
+};
+
 // Search documents
 export const searchDocuments = async (searchParams) => {
   try {
@@ -229,6 +266,8 @@ export const getDocumentDetails = async (documentId) => {
 export default {
   uploadFile,
   getTags,
+  searchDocumentTags,
+  getAllDocumentTags,
   searchDocuments,
   downloadDocument,
   deleteDocument,

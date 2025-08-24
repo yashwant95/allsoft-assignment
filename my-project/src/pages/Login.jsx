@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { EyeInvisibleOutlined, EyeTwoTone, MobileOutlined, KeyOutlined } from '@ant-design/icons';
 import { Form, Input, Button, Card, message, notification, Typography, Spin } from 'antd';
-import { generateOTP } from '../coreApi/authentication/LoginApi';
+import { generateOTP, validateOTP } from '../coreApi/authentication/LoginApi';
 
 const { Title, Text } = Typography;
 
@@ -54,28 +54,50 @@ const Login = () => {
   
   // Handle login submission
   const handleLogin = async (values) => {
-    // Simulate loading
-    setIsLoading(true);
-    
-    // Simulate API delay
-    setTimeout(() => {
+    try {
+      // Set loading state
+      setIsLoading(true);
+      
+      // Call the validateOTP API
+      const response = await validateOTP(values.mobileNumber, values.otp);
+      
+      // Handle successful OTP validation
+      if (response.success || response.status === 'success') {
+        // Store user data if available
+        if (response.token) {
+          localStorage.setItem('authToken', response.token);
+        }
+        if (response.user) {
+          localStorage.setItem('userData', JSON.stringify(response.user));
+        }
+        localStorage.setItem('userMobile', values.mobileNumber);
+        
+        notification.success({
+          message: 'Login Successful!',
+          description: 'Welcome to Document Management System.',
+          placement: 'topRight',
+          duration: 4.5
+        });
+        
+        // Reset form
+        form.resetFields();
+        setShowOTP(false);
+      } else {
+        message.error('Invalid OTP. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('Error during login:', error);
+      
+      // Show error message to user
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Login failed. Please check your OTP and try again.');
+      }
+    } finally {
       setIsLoading(false);
-      
-      // Simulate successful login
-      localStorage.setItem('demoAuthToken', 'demo-token-123');
-      localStorage.setItem('demoUserMobile', values.mobileNumber);
-      
-      notification.success({
-        message: 'Login Successful!',
-        description: 'Welcome to Document Management System.',
-        placement: 'topRight',
-        duration: 4.5
-      });
-      
-      // Reset form
-      form.resetFields();
-      setShowOTP(false);
-    }, 1500);
+    }
   };
 
   return (

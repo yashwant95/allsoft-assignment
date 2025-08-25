@@ -53,7 +53,7 @@ const Sidebar = ({ isOpen, setIsSidebarOpen }) => {
         className={`fixed md:relative z-50 transition-all duration-300 ${
           isOpen ? "w-64" : "w-20"
         } h-screen flex flex-col
-        bg-purple-600
+        sidebar-bg
         rounded-r-3xl shadow-2xl border-none`}
         initial={{ x: -200 }}
         animate={{ x: 0 }}

@@ -1,14 +1,57 @@
 @import "tailwindcss";
 
-:root {
-    --primary-color: #1890ff;
-    --secondary-color: #52c41a;
-    --text-color: #000000;
-    --background-color: #ffffff;
-    --link-color: #1890ff;
-    --header-background-color: #ffffff;
-    --header-text-color: #000000;
-  }
 
 
-  
+
+/* Sidebar background - exact match to Wadde admin (#eff6ff) */
+.sidebar-bg {
+  background-color: #eff6ff !important;
+}
+
+/* Page background to match Wadde admin (apply to all roots) */
+html,
+body,
+#root {
+  background-color: #eff6ff !important;
+  min-height: 100%;
+}
+
+/* If using Ant Design Layout, align its background too */
+.ant-layout,
+.ant-layout-content {
+  background-color: #eff6ff !important;
+}
+
+/* Sidebar menu text and hover styles for light background */
+.sidebar-menu {
+  color: #1f2937; /* gray-800 */
+}
+
+.sidebar-menu a,
+.sidebar-menu button,
+.sidebar-menu .menu-item {
+  color: #1f2937; /* ensure readable on light bg */
+}
+
+.sidebar-menu a.active,
+.sidebar-menu a[aria-current="page"],
+.sidebar-menu .active {
+  background-color: #ecfdf5 !important; /* requested active bg */
+  color: #16a34a !important; /* green-600 text */
+}
+
+.sidebar-menu a:hover,
+.sidebar-menu button:hover,
+.sidebar-menu .menu-item:hover {
+  background-color: #e5e7eb; /* gray-200 hover */
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @apply bg-blue-50;  /* Using Tailwind's green-100 */
+}
